@@ -33,7 +33,6 @@ st.markdown(
         .stApp {
             background-color: var(--background-color);
         }
-        header {visibility: hidden;}
         footer {visibility: hidden;}
         .block-container {
             padding-top: 2rem;

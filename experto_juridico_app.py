@@ -164,7 +164,14 @@ def ai_draft(solution: str, stage: str, assistant_id: str, area: str, original_t
 # Interfaz principal                                                           
 ###############################################################################
 
-st.title("Experto Jurídico 7.0")
+# Crear layout de dos columnas para el título y la imagen
+col1, col2 = st.columns([2, 1])  # La primera columna es el doble de ancha que la segunda
+
+with col1:
+    st.title("Experto Jurídico 7.0")
+
+with col2:
+    st.image("abogada experta japon.png", width=150)  # Tamaño fijo de 150 píxeles
 
 # Selección del área
 area = st.selectbox(

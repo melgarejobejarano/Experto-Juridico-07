@@ -1360,78 +1360,157 @@ elif st.session_state.page == "generar":
         else:
             st.info("👆 Sube un documento para continuar")
 
-# Paso 4: Opciones
-elif st.session_state.paso_actual == 4:
-    st.header("Paso 4: Opciones sugeridas")
-    analysis = st.session_state.analysis
-    st.info(f"**Etapa procesal:** {analysis['etapa_proceso']}")
-    choice = st.radio(
-        "Seleccione la acción a realizar:",
-        analysis['soluciones'],
-        format_func=lambda x: x.strip("123. "),
-        horizontal=True
-    )
-    if choice:
-        formato = determinar_formato(choice)
-        st.info(f"**Formato sugerido:** {formato}")
-    if st.button("Generar documento ▶️", type="primary") and choice:
-        with st.spinner("Generando documento..."):
-            draft_text = ai_draft(
-                choice,
-                analysis['etapa_proceso'],
-                ASSISTANT_IDS[st.session_state.area],
-                st.session_state.area,
-                st.session_state.rol,
-                st.session_state.document_text
+    # Paso 4: Opciones
+    elif st.session_state.paso_actual == 4:
+        st.header("Paso 4: Opciones sugeridas")
+        
+        if "analysis" not in st.session_state:
+            st.error("No hay análisis disponible. Por favor, vuelve al paso anterior.")
+            if st.button("⬅️ Volver al paso anterior"):
+                st.session_state.paso_actual = 3
+                st.rerun()
+        else:
+            analysis = st.session_state.analysis
+            st.info(f"**Etapa procesal:** {analysis['etapa_proceso']}")
+            
+            # Contenedor para las opciones
+            st.markdown(
+                """
+                <style>
+                .option-container {
+                    background-color: white;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    margin: 1rem 0;
+                    border: 1px solid #E2E8F0;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
             )
-            st.session_state.draft_text = draft_text
-            st.session_state.paso_actual = 5
-            st.toast("¡Documento generado! 📄")
-            st.rerun()
-
-# Paso 5: Resultado
-elif st.session_state.paso_actual == 5:
-    st.header("Paso 5: Documento generado")
-    with st.expander("Ver documento", expanded=True):
-        st.text_area(
-            "Contenido del documento",
-            st.session_state.draft_text,
-            height=500,
-            help="Puede copiar el texto o descargarlo en formato Word"
-        )
-    col1, col2 = st.columns(2)
-    with col1:
-        # Generar documento Word
-        doc = Document()
-        doc.add_paragraph(st.session_state.draft_text)
-        # Guardar temporalmente
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-            doc.save(tmp.name)
-            # Leer el archivo para la descarga
-            with open(tmp.name, "rb") as docx_file:
-                docx_bytes = docx_file.read()
-                st.download_button(
-                    label="📥 Descargar DOCX",
-                    data=docx_bytes,
-                    file_name="documento_legal.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            
+            # Mostrar las opciones como radio buttons
+            choice = st.radio(
+                "Seleccione la acción a realizar:",
+                analysis['soluciones'],
+                format_func=lambda x: x.strip("123. "),
+                key="option_choice"
+            )
+            
+            if choice:
+                formato = determinar_formato(choice)
+                st.info(f"**Formato sugerido:** {formato}")
+                
+                # Botón centrado
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    if st.button("Generar documento ▶️", type="primary", use_container_width=True):
+                        with st.spinner("Generando documento..."):
+                            try:
+                                draft_text = ai_draft(
+                                    choice,
+                                    analysis['etapa_proceso'],
+                                    ASSISTANT_IDS[st.session_state.area],
+                                    st.session_state.area,
+                                    st.session_state.rol,
+                                    st.session_state.document_text
+                                )
+                                
+                                if draft_text:
+                                    st.session_state.draft_text = draft_text
+                                    st.session_state.paso_actual = 5
+                                    st.toast("¡Documento generado! 📄")
+                                    st.rerun()
+                                else:
+                                    st.error("No se pudo generar el documento.")
+                            except Exception as e:
+                                st.error(f"Error al generar el documento: {str(e)}")
+    
+    # Paso 5: Resultado
+    elif st.session_state.paso_actual == 5:
+        st.header("Paso 5: Documento generado")
+        
+        if "draft_text" not in st.session_state:
+            st.error("No hay documento generado. Por favor, vuelve al paso anterior.")
+            if st.button("⬅️ Volver al paso anterior"):
+                st.session_state.paso_actual = 4
+                st.rerun()
+        else:
+            # Contenedor para el documento
+            st.markdown(
+                """
+                <style>
+                .document-container {
+                    background-color: white;
+                    padding: 2rem;
+                    border-radius: 8px;
+                    border: 1px solid #E2E8F0;
+                    margin: 1rem 0;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
+            
+            with st.expander("Ver documento", expanded=True):
+                st.text_area(
+                    "Contenido del documento",
+                    value=st.session_state.draft_text,
+                    height=500,
+                    help="Puede copiar el texto o descargarlo en formato Word"
                 )
-            # Limpiar archivo temporal
-            os.unlink(tmp.name)
-    
-    with col2:
-        # Botón para descargar el historial
-        conversation_json = get_conversation_json()
-        st.download_button(
-            label="📥 Descargar historial",
-            data=conversation_json,
-            file_name=f"historial_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-            mime="application/json"
-        )
-    
-    if st.button("Nuevo documento 🔄", type="primary"):
-        st.session_state.paso_actual = 1
-        st.rerun()
+            
+            # Botones de descarga
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                try:
+                    # Generar documento Word
+                    doc = Document()
+                    doc.add_paragraph(st.session_state.draft_text)
+                    
+                    # Guardar temporalmente
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+                        doc.save(tmp.name)
+                        # Leer el archivo para la descarga
+                        with open(tmp.name, "rb") as docx_file:
+                            docx_bytes = docx_file.read()
+                            st.download_button(
+                                label="📥 Descargar DOCX",
+                                data=docx_bytes,
+                                file_name="documento_legal.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                use_container_width=True
+                            )
+                        # Limpiar archivo temporal
+                        os.unlink(tmp.name)
+                except Exception as e:
+                    st.error(f"Error al generar el archivo DOCX: {str(e)}")
+            
+            with col2:
+                try:
+                    # Botón para descargar el historial
+                    conversation_json = get_conversation_json()
+                    st.download_button(
+                        label="📥 Descargar historial",
+                        data=conversation_json,
+                        file_name=f"historial_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                        mime="application/json",
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f"Error al generar el historial: {str(e)}")
+            
+            # Botón para nuevo documento
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("Nuevo documento 🔄", type="primary", use_container_width=True):
+                    # Limpiar estados relevantes
+                    for key in ['paso_actual', 'area', 'rol', 'analysis', 'document_text', 'draft_text']:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.session_state.paso_actual = 1
+                    st.rerun()
 
 elif st.session_state.page == "historial":
     st.title("Historial de documentos")
